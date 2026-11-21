@@ -1,0 +1,13 @@
+{
+  "name": "Automine — Economia direta no caixa",
+  "short_name": "Automine",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#0C0924",
+  "theme_color": "#0C0924",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

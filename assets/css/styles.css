@@ -178,6 +178,12 @@ strong {
   border: 0;
 }
 
+@media (max-width: 420px) {
+  .hide-sm {
+    display: none;
+  }
+}
+
 .skip-link {
   position: fixed;
   top: 12px;

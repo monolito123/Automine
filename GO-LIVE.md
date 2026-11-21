@@ -1,6 +1,6 @@
 # Go-live checklist — automine.com.br
 
-One-time setup to publish the site at **https://automine.com.br** and create **vendas@automine.com.br** on Zoho Mail. Do the steps in this order.
+One-time setup to publish the site at **https://automine.com.br** and forward **vendas@automine.com.br** to an existing inbox for free with ImprovMX. Do the steps in this order.
 
 **Starting point** (checked against public DNS on 21 Nov 2026):
 
@@ -21,15 +21,13 @@ Do this before touching DNS. GitHub recommends adding the custom domain in the r
 
 > If the run fails with *"Branch main is not allowed to deploy to github-pages due to environment protection rules"*, go to **Settings → Environments → github-pages → Deployment branches and tags** and add `main`.
 
-## 2. Zoho Mail: create the account and mailbox (about 10 min)
+## 2. ImprovMX: free e-mail forwarding (about 5 min)
 
-- [ ] Sign up at **zoho.com/mail** (business e-mail) and pick a plan. Zoho lists a **Mail Free** plan (up to 5 users, 5 GB each, web and mobile app only, no IMAP/POP) but says it's "available only in select data centers". If it isn't offered to you, **Mail Lite** is the low-cost paid option. Prices are shown in BRL.
-- [ ] When asked for a domain, enter `automine.com.br`.
-- [ ] Create the mailbox **vendas@automine.com.br**. The simplest setup is to make it the first (admin) account. If several people need it later, add them as users and turn `vendas@` into a group mailbox.
-- [ ] Zoho shows a **verification TXT** value (`zoho-verification=zb…`). Keep that tab open: you add it in step 3, then click **Verify** in Zoho.
-- [ ] After step 3: **Zoho Admin Console → Domains → automine.com.br → Email Configuration → DKIM → Add**. Use selector `zoho` and key length **1024**: the value then fits in a single TXT string, which is safest with Registro.br's editor. Copy the TXT value, add it in Registro.br (step 3, row DKIM), then click **Verify** and **Enable** in Zoho.
+- [ ] Create a free account at **improvmx.com** and add the domain `automine.com.br`.
+- [ ] Create the alias **`vendas`** and point it at the inbox that should receive the leads (e.g. your Gmail).
+- [ ] ImprovMX creates a catch-all alias (`*`) by default, which forwards *every* address `@automine.com.br`. Delete it if you only want `vendas@`; that means less spam.
 
-> **Data center:** these values are for Zoho's default `.com` data center. If your Zoho admin address ends in `.eu`, `.in` or `.com.au`, use the MX and SPF values Zoho shows you instead.
+> **Free plan** (ImprovMX pricing page): 1 domain, 25 aliases, 500 forwarded e-mails a day (past that, mail bounces until 00:00 UTC) and 7 days of logs. Sending through ImprovMX (SMTP) is paid only, so replies go out from your own inbox, not from `vendas@`.
 
 ## 3. Registro.br: DNS, all in one session
 
@@ -37,11 +35,16 @@ Go to **registro.br → Painel → automine.com.br → DNS → Editar zona**. In
 
 ### Remove: these block e-mail
 
-| Type | Name   | Value                  |
-|------|--------|------------------------|
-| MX   | (empty) | `0 .` (null MX)        |
-| TXT  | (empty) | `v=spf1 -all`          |
-| TXT  | `_dmarc` | `v=DMARC1; p=reject;` (replaced below) |
+| Type | Name   | Value |
+|------|--------|-------|
+| MX   | (empty) | `0 .` (null MX) |
+| TXT  | (empty) | `v=spf1 -all` (replaced by ImprovMX's SPF below) |
+
+### Keep
+
+| Type | Name     | Value | Why |
+|------|----------|-------|-----|
+| TXT  | `_dmarc` | `v=DMARC1; p=reject;` | The domain never sends mail itself, so this stops anyone faking `vendas@automine.com.br`. It doesn't affect forwarded mail. |
 
 ### Add: website (GitHub Pages)
 
@@ -57,29 +60,22 @@ Go to **registro.br → Painel → automine.com.br → DNS → Editar zona**. In
 | AAAA  | (empty) | `2606:50c0:8003::153`   |
 | CNAME | `www`  | `monolito123.github.io` |
 
-### Add: e-mail (Zoho Mail)
+### Add: e-mail forwarding (ImprovMX)
 
-| Type | Name               | Priority | Value |
-|------|--------------------|----------|-------|
-| MX   | (empty)            | 10       | `mx.zoho.com` |
-| MX   | (empty)            | 20       | `mx2.zoho.com` |
-| MX   | (empty)            | 50       | `mx3.zoho.com` |
-| TXT  | (empty)            |          | `v=spf1 include:zohomail.com ~all` |
-| TXT  | (empty)            |          | `zoho-verification=zb…` (the exact value from Zoho, step 2) |
-| TXT  | `zoho._domainkey`  |          | `v=DKIM1; k=rsa; p=…` (the exact value from Zoho, step 2) |
-| TXT  | `_dmarc`           |          | `v=DMARC1; p=none;` (tightened in step 4) |
+| Type | Name   | Priority | Value |
+|------|--------|----------|-------|
+| MX   | (empty) | 10       | `mx1.improvmx.com` |
+| MX   | (empty) | 20       | `mx2.improvmx.com` |
+| TXT  | (empty) |          | `v=spf1 include:spf.improvmx.com ~all` |
 
-Keep **only one** SPF record (`v=spf1 …`). If you later send through another tool (CRM, newsletter), add its `include:` to that same record.
+Keep **only one** SPF record (`v=spf1 …`). ImprovMX needs it because forwarded mail goes out with your domain as the envelope sender, so it can handle bounces.
 
 ## 4. Finish and test
 
-DNS changes at Registro.br usually show up within minutes. Allow up to a couple of hours.
-
 - [ ] **GitHub → Settings → Pages**: once the certificate is ready, tick **Enforce HTTPS**. This usually takes under an hour and can take up to 24 h.
 - [ ] Open https://automine.com.br and https://www.automine.com.br. The second should redirect to the first.
-- [ ] Send a test from `vendas@automine.com.br` to a Gmail account, open it, and choose **⋮ → Show original**. SPF, DKIM and DMARC should all say **PASS**. Then reply to it to test incoming mail.
-- [ ] Click the site's e-mail buttons and submit the contact form with "Enviar por e-mail". The message should reach the Zoho inbox.
-- [ ] About a week later, if everything delivers fine, change `_dmarc` to `v=DMARC1; p=quarantine;`.
+- [ ] From an account **other than** the destination inbox, send an e-mail to `vendas@automine.com.br`. It should arrive within a minute or two. Gmail hides copies of messages you sent to yourself, so testing from the same account looks like a failure. ImprovMX's dashboard shows the domain status and delivery logs. ImprovMX says DNS changes can take 24–48 h to fully propagate, though Registro.br is usually much faster.
+- [ ] Click the site's e-mail buttons and submit the contact form with "Enviar por e-mail". The message should reach your inbox.
 
 ### Optional
 

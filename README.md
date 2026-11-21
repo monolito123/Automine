@@ -4,7 +4,7 @@ Landing page for **automine.com.br**: resource management and cost reduction (lo
 
 Every call to action leads to **WhatsApp (+55 11 91146-8466)** or **e-mail (vendas@automine.com.br)**. Messages are pre-filled with the context the visitor came from (the plan, service or simulation they picked).
 
-It is a static site with no build step, no framework and no third-party requests: fonts are self-hosted and the illustrations are inline SVG.
+It is a static site with no framework and no third-party requests: fonts are self-hosted and the illustrations are inline SVG. The only build step copies the public files into `dist/` (see [Deploy](#deploy)).
 
 ## Page structure
 
@@ -38,9 +38,17 @@ Then open http://localhost:8000. Use a local server rather than opening the file
 
 ## Deploy
 
-`.github/workflows/deploy-pages.yml` publishes the site to GitHub Pages on every push to `main`. You can also run it by hand from the **Actions** tab. Only the public files are published: `index.html`, `404.html`, `assets/`, `robots.txt`, `sitemap.xml` and `site.webmanifest`.
+Cloudflare Pages builds and publishes the site from the `main` branch:
 
-The one-time setup is in **[GO-LIVE.md](GO-LIVE.md)**: GitHub Pages settings, moving DNS from Registro.br to Cloudflare (including DNSSEC), the site's records, Cloudflare Email Routing for `vendas@automine.com.br`, the options for sending as that address from Gmail, and final tests.
+| Setting | Value |
+|---|---|
+| Build command | `sh tools/build.sh` |
+| Build output directory | `dist` |
+| Production branch | `main` |
+
+`tools/build.sh` copies only the public files (`index.html`, `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` and `assets/`) into `dist/`. The README, the checklist, the tools and the rest of the repository are not published.
+
+The full one-time setup is in **[GO-LIVE.md](GO-LIVE.md)**: creating the Pages project, moving DNS from Registro.br to Cloudflare (including DNSSEC), the custom domain, Email Routing for `vendas@automine.com.br`, sending as that address from Gmail, and final tests.
 
 ## Before going live: please confirm
 

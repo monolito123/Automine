@@ -1,114 +1,100 @@
-# Go-live checklist — automine.com.br (Cloudflare)
+# Go-live checklist — automine.com.br
 
-One-time setup:
+- **Website:** built and hosted by **Cloudflare Pages** from the `main` branch of this repository, served at **https://automine.com.br**.
+- **E-mail:** `vendas@automine.com.br` *receives* through Cloudflare Email Routing (free). It *sends* from Gmail's "Send mail as" through one of the options in step 6.
 
-- **Site:** https://automine.com.br, hosted on GitHub Pages.
-- **DNS:** moved from Registro.br to Cloudflare.
-- **E-mail:** `vendas@automine.com.br` *receives* through Cloudflare Email Routing (free) and *sends* from Gmail's "Send mail as". Step 6 has the sending options.
-
-Do the steps in this order.
+Do the steps in order. Steps 1 and 2 don't change the live domain. Step 3 changes DNS and needs a 24–48 h wait.
 
 **Starting point** (checked against public DNS on 21 Nov 2026):
 
-- **DNS:** hosted by Registro.br (`a.auto.dns.br`, `b.auto.dns.br`).
-- **DNSSEC:** on. There is a DS record at the `.br` registry with key tag `33150`, algorithm 13.
-- **Website records:** none yet.
-- **E-mail:** turned off by Registro.br's defaults: null MX `0 .`, `v=spf1 -all` and DMARC `p=reject`.
+- **DNS:** Registro.br (`a.auto.dns.br`, `b.auto.dns.br`).
+- **DNSSEC:** on. DS record at the `.br` registry with key tag `33150`, algorithm 13.
+- **Website records:** none.
+- **E-mail:** off, because of Registro.br's defaults: null MX `0 .`, `v=spf1 -all` and DMARC `p=reject`.
 
 ---
 
-## 1. GitHub: turn on hosting (about 2 min)
+## 1. Cloudflare Pages: build and test on pages.dev (about 10 min)
 
-- [ ] **Settings → General → Default branch**: switch to `main`.
-- [ ] **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions**.
-- [ ] **Settings → Pages → Custom domain**: type `automine.com.br` and **Save**. GitHub's DNS check will complain until the domain points here. That's expected.
-- [ ] **Actions → "Deploy site to GitHub Pages" → Run workflow** (or ask Claude to trigger it).
+No DNS changes are needed for this step.
 
-> If the run fails with *"Branch main is not allowed to deploy to github-pages due to environment protection rules"*, go to **Settings → Environments → github-pages → Deployment branches and tags** and add `main`.
+- [ ] **Workers & Pages → Create application → Pages → Connect to Git.** Choose GitHub and authorize the Cloudflare GitHub app for `monolito123/Automine`.
+- [ ] **Project name:** `automine` (this creates `automine.pages.dev`). If the name is taken, choose another.
+- [ ] **Production branch:** `main`.
+- [ ] **Build command:** `sh tools/build.sh`. **Build output directory:** `dist`. **Root directory:** leave empty.
+- [ ] **Save and Deploy.** Open `https://automine.pages.dev` and check the page. Open `/naoexiste` too; it should show the 404 page.
 
-## 2. Cloudflare: add the domain (Free plan)
+## 2. Cloudflare: add the domain on the Free plan (about 15 min)
 
-- [ ] Create a Cloudflare account, choose **Add a domain**, enter `automine.com.br` and pick the **Free** plan. Cloudflare copies the current records.
-- [ ] Fix the copied records:
-  - Delete MX `0 .`.
-  - Delete TXT `v=spf1 -all`.
-  - Edit TXT `_dmarc` to `v=DMARC1; p=none;` for now (tightened in step 7).
-- [ ] Add the website records. Set **Proxy status** to **DNS only** (grey cloud), so GitHub can issue the HTTPS certificate:
+- [ ] **Domains → Onboard a domain** → `automine.com.br` → **Full setup** → **Free** plan. Cloudflare copies the current records.
+- [ ] **Delete** MX `@` (`0 .`) and TXT `@` (`v=spf1 -all`).
+- [ ] **Edit** TXT `_dmarc` to `v=DMARC1; p=none;`. Tighten it in step 8.
+- [ ] **Don't add website records** (A, AAAA, or a `www` CNAME pointing to GitHub). Step 4 creates the right ones. If you added GitHub records earlier, delete them, because they conflict with the Pages domain.
+- [ ] Note the **two nameservers** Cloudflare assigns (`xxxx.ns.cloudflare.com`).
 
-  | Type  | Name  | Content                 | Proxy    |
-  |-------|-------|-------------------------|----------|
-  | A     | `@`   | `185.199.108.153`       | DNS only |
-  | A     | `@`   | `185.199.109.153`       | DNS only |
-  | A     | `@`   | `185.199.110.153`       | DNS only |
-  | A     | `@`   | `185.199.111.153`       | DNS only |
-  | AAAA  | `@`   | `2606:50c0:8000::153`   | DNS only |
-  | AAAA  | `@`   | `2606:50c0:8001::153`   | DNS only |
-  | AAAA  | `@`   | `2606:50c0:8002::153`   | DNS only |
-  | AAAA  | `@`   | `2606:50c0:8003::153`   | DNS only |
-  | CNAME | `www` | `monolito123.github.io` | DNS only |
+## 3. Registro.br: remove DNSSEC, wait, then change nameservers (day 1, then day 2–3)
 
-- [ ] Write down the **two nameservers** Cloudflare assigns (`something.ns.cloudflare.com`). They're unique to your account.
+The order matters. If the old DS record stays while the nameservers change, DNSSEC-validating resolvers will reject the domain.
 
-## 3. Registro.br: point the domain to Cloudflare
+- [ ] **Registro.br → Painel → automine.com.br → DNSSEC:** remove the DS record with key tag `33150`. Save. If the panel doesn't allow this, stop and ask for help.
+- [ ] **Wait 24–48 h**, then confirm the DS has left public DNS. Ask Claude to check, or run `dig DS automine.com.br`.
+- [ ] **Registro.br → DNS servers:** replace `a.auto.dns.br` and `b.auto.dns.br` with the two Cloudflare nameservers. Save.
+- [ ] Wait until the domain shows **Active** in Cloudflare (usually 1–2 h, and can take up to 24 h).
 
-- [ ] **registro.br → Painel → automine.com.br → DNS**: change the DNS servers from `a.auto.dns.br` / `b.auto.dns.br` to the two Cloudflare nameservers.
-- [ ] **DNSSEC:** make sure the current DS record (key tag `33150`) is removed. If the form has DNSSEC/DS fields, leave them **empty** for now.
-  - That key belongs to Registro.br's DNS service. If it stays after the switch, most resolvers will reject the domain, and the site and e-mail stop working.
-  - Ask Claude to check the `.br` registry after you save; this can be confirmed from public DNS.
-- [ ] Wait until Cloudflare shows the domain as **Active**. This usually takes an hour or two and can take up to 24 h.
+## 4. Cloudflare Pages: attach the custom domain (after Active)
 
-## 4. Turn DNSSEC back on, now with Cloudflare
-
-- [ ] **Cloudflare → DNS → Settings → DNSSEC → Enable**. Cloudflare shows the DS details: key tag, algorithm 13, digest type 2 and digest.
-- [ ] Add that DS in Registro.br's DNSSEC section for the domain.
+- [ ] **Workers & Pages → automine → Custom domains → Add a custom domain** → `automine.com.br`. Cloudflare creates the proxied CNAME for the apex automatically. Don't create it by hand.
+- [ ] Add `www.automine.com.br` the same way.
+- [ ] Wait for both to show **Active**. Cloudflare issues the HTTPS certificates.
+- [ ] Optional: redirect `www` to the apex. See "Redirecting www to domain apex" in the Pages docs.
 
 ## 5. Receive: Cloudflare Email Routing (free)
 
-- [ ] **Cloudflare → Email → Email Routing**, then set up the domain. Cloudflare adds these records automatically:
+- [ ] **Email → Email Routing → Set up your domain.** Accept the automatic MX, SPF and DKIM records.
+- [ ] **Destination addresses:** add the inbox that should receive leads (e.g. your Gmail), then click the verification link Cloudflare e-mails you. Rules stay disabled until you do.
+- [ ] **Routing rules:** create `vendas@automine.com.br` → **Send to an email** → that inbox. Save.
 
-  | Type | Name                  | Content |
-  |------|-----------------------|---------|
-  | MX   | `@`                   | `route1.mx.cloudflare.net`, `route2.mx.cloudflare.net`, `route3.mx.cloudflare.net` (priorities set by Cloudflare) |
-  | TXT  | `@`                   | `v=spf1 include:_spf.mx.cloudflare.net ~all` |
-  | TXT  | `cf2024-1._domainkey` | DKIM key generated by Cloudflare |
-
-- [ ] **Destination addresses**: add the inbox that should receive leads (e.g. your Gmail), then click the verification link Cloudflare e-mails you. Rules stay disabled until you do.
-- [ ] **Routing rules → Custom address**: `vendas@automine.com.br` → that inbox.
+Email Routing can't be used with external mail servers, so don't add MX records from another provider.
 
 ## 6. Send as vendas@ from Gmail: pick one option
 
-Cloudflare Email Routing only *receives*. To send as `vendas@automine.com.br`, Gmail needs an SMTP server that is allowed to send for the domain.
+Email Routing only *receives*. To send as `vendas@automine.com.br`, Gmail needs an SMTP server that is allowed to send for the domain.
 
 ### Option A: Cloudflare Email Sending (paid)
 
-The Workers **Paid** plan is required, and the feature is in **beta**. It includes 3,000 e-mails a month, then US$0.35 per 1,000 (Cloudflare pricing page).
+Requires the Workers **Paid** plan. Email Sending is in **beta**. It includes 3,000 e-mails a month, then US$0.35 per 1,000 (Cloudflare pricing page, as checked).
 
-- [ ] Subscribe to Workers Paid, then onboard `automine.com.br` for **Email Sending**. Cloudflare adds its records on the `cf-bounce` subdomain (MX, SPF, DKIM `cf-bounce._domainkey`) automatically.
-- [ ] Create a Cloudflare **API token** with the permission **Email Sending: Edit**.
-- [ ] In **Gmail → Settings → Accounts and Import → Send mail as → Add another email address**:
-  - Name: e.g. *Automine Vendas*. Address: `vendas@automine.com.br`.
+- [ ] Subscribe to Workers Paid. Then **Email Service → Email Sending** → add `automine.com.br`. Cloudflare adds its records on the `cf-bounce` subdomain automatically.
+- [ ] Create an API token with the permission **Email Sending: Edit**. Don't paste it into chat.
+- [ ] **Gmail → Settings → See all settings → Accounts and Import → Send mail as → Add another email address**:
+  - Name: e.g. *Automine Vendas*. Address: `vendas@automine.com.br`. **Uncheck "Treat as an alias".**
   - SMTP server: `smtp.mx.cloudflare.net`, port `465`, **Secured connection using SSL**.
-  - Username: the literal text `api_token`. Password: the API token.
-  - Gmail sends a confirmation code to `vendas@`. Email Routing delivers it to your inbox; enter the code.
+  - Username: `api_token` (the literal text). Password: the API token.
+  - Gmail sends a confirmation code to `vendas@`. It arrives through Email Routing. Enter the code.
 
 ### Option B: free outside SMTP service
 
-Some e-mail delivery services (for example Brevo) have free tiers that include an SMTP server. Limits change, so check them on the provider's site.
+Some providers (for example Brevo) have free plans that include SMTP. Limits change, so check the provider's site before choosing.
 
-- [ ] Create the account and authenticate `automine.com.br`. Add the DNS records their dashboard shows (usually DKIM) in Cloudflare.
-- [ ] If they ask for an SPF `include:`, add it to the **same** SPF record. Example: `v=spf1 include:_spf.mx.cloudflare.net include:<their-include> ~all`. Only one SPF record is allowed, and SPF allows at most 10 DNS lookups.
-- [ ] Set up Gmail's **Send mail as** exactly like Option A, using their SMTP host, port and credentials.
+- [ ] Create the account and authenticate `automine.com.br`. Add the DNS records their dashboard shows, in Cloudflare.
+- [ ] If they require an SPF `include:`, add it to the **same** SPF record, e.g. `v=spf1 include:_spf.mx.cloudflare.net include:<their-include> ~all`. Only one SPF record is allowed, and SPF allows at most 10 DNS lookups.
+- [ ] Set up Gmail's "Send mail as" the same way as Option A, using their host, port and credentials.
 
-## 7. Finish and test
+## 7. DNSSEC back on (optional)
 
-- [ ] **GitHub → Settings → Pages**: once the certificate is ready, tick **Enforce HTTPS**. This usually takes under an hour and can take up to 24 h.
-- [ ] Open https://automine.com.br and https://www.automine.com.br. The second should redirect to the first.
-- [ ] From an account **other than** your inbox, send to `vendas@automine.com.br`. It should arrive within a minute or two. Gmail hides copies of messages you sent to yourself, so testing from the same account looks like a failure.
-- [ ] From Gmail, send *as* `vendas@` to another account and choose **⋮ → Show original**. SPF, DKIM and DMARC should all say **PASS**.
-- [ ] Click the site's e-mail buttons and submit the contact form with "Enviar por e-mail".
-- [ ] About a week later, if everything delivers fine, change `_dmarc` to `v=DMARC1; p=quarantine;`.
+- [ ] In Cloudflare, open the domain and enable **DNSSEC**. Copy the DS details it shows: key tag, algorithm 13, digest type 2, digest.
+- [ ] **Registro.br → DNSSEC:** add the DS. Save.
+- [ ] Ask Claude to verify the DS in public DNS. A wrong DS makes the domain fail for validating resolvers, so do this only after the tests pass.
+
+## 8. Finish and test
+
+- [ ] `https://automine.com.br` opens with HTTPS, and `www.automine.com.br` works too.
+- [ ] Ask Claude to check public DNS. The apex should have A/AAAA (from Pages) and MX (from Email Routing) at the same time.
+- [ ] From another account, send to `vendas@automine.com.br`. It should arrive within a minute or two. Gmail hides copies of messages you send to yourself, so a self-test looks like a failure.
+- [ ] From Gmail, send *as* `vendas@` to another account, then **⋮ → Show original**. SPF, DKIM and DMARC should all say **PASS**.
+- [ ] The site's "Enviar por e-mail" buttons and the contact form open the e-mail with the message ready.
+- [ ] After a week with no problems, change `_dmarc` to `v=DMARC1; p=quarantine;`.
 
 ### Optional
 
-- [ ] Verify the domain on GitHub (**profile → Settings → Pages → Add a domain**). This adds one TXT record and prevents domain takeover.
 - [ ] Add the site to Google Search Console and submit `https://automine.com.br/sitemap.xml`.

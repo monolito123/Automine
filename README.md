@@ -38,17 +38,20 @@ Then open http://localhost:8000. Use a local server rather than opening the file
 
 ## Deploy
 
-Cloudflare Pages builds and publishes the site from the `main` branch:
+The site runs on Cloudflare as the Worker `automine`. `tools/deploy_cloudflare.py` builds `dist/` with `tools/build.sh` and uploads the public files as data modules of the Worker, so there's no separate asset upload:
 
-| Setting | Value |
-|---|---|
-| Build command | `sh tools/build.sh` |
-| Build output directory | `dist` |
-| Production branch | `main` |
+```bash
+CLOUDFLARE_API_TOKEN=<token> python3 tools/deploy_cloudflare.py            # publish
+CLOUDFLARE_API_TOKEN=<token> python3 tools/deploy_cloudflare.py --domains  # also (re)attach automine.com.br and www
+```
 
-`tools/build.sh` copies only the public files (`index.html`, `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` and `assets/`) into `dist/`. The README, the checklist, the tools and the rest of the repository are not published.
+The token needs **Workers Scripts: Edit** (account). For `--domains` it also needs **Workers Routes: Edit** and **Zone: Read** (zone).
 
-The full one-time setup is in **[GO-LIVE.md](GO-LIVE.md)**: creating the Pages project, moving DNS from Registro.br to Cloudflare (including DNSSEC), the custom domain, Email Routing for `vendas@automine.com.br`, sending as that address from Gmail, and final tests.
+- Preview address: https://automine.automine40.workers.dev
+- `www.automine.com.br` redirects to `automine.com.br`.
+- Only the public files are published (`index.html`, `404.html`, `robots.txt`, `sitemap.xml`, `site.webmanifest` and `assets/`). Any other path gets the 404 page.
+
+Run the script again after changing the site. The go-live status and the remaining one-time steps (nameservers, Email Routing, tests) are in **[GO-LIVE.md](GO-LIVE.md)**.
 
 ## Before going live: please confirm
 

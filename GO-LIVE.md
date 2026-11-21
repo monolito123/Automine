@@ -1,81 +1,112 @@
-# Go-live checklist — automine.com.br
+# Go-live checklist — automine.com.br (Cloudflare)
 
-One-time setup to publish the site at **https://automine.com.br** and forward **vendas@automine.com.br** to an existing inbox for free with ImprovMX. Do the steps in this order.
+One-time setup:
+
+- **Site:** https://automine.com.br, hosted on GitHub Pages.
+- **DNS:** moved from Registro.br to Cloudflare.
+- **E-mail:** `vendas@automine.com.br` *receives* through Cloudflare Email Routing (free) and *sends* from Gmail's "Send mail as". Step 6 has the sending options.
+
+Do the steps in this order.
 
 **Starting point** (checked against public DNS on 21 Nov 2026):
 
-- **Domain:** registered at Registro.br, which also hosts its DNS (`a.auto.dns.br`, `b.auto.dns.br`).
+- **DNS:** hosted by Registro.br (`a.auto.dns.br`, `b.auto.dns.br`).
+- **DNSSEC:** on. There is a DS record at the `.br` registry with key tag `33150`, algorithm 13.
 - **Website records:** none yet.
-- **E-mail:** turned off by Registro.br's defaults: a null MX (`0 .`), `v=spf1 -all` and DMARC `p=reject`. Mail sent to the domain bounces until step 3.
+- **E-mail:** turned off by Registro.br's defaults: null MX `0 .`, `v=spf1 -all` and DMARC `p=reject`.
 
 ---
 
 ## 1. GitHub: turn on hosting (about 2 min)
 
-Do this before touching DNS. GitHub recommends adding the custom domain in the repository first, so nobody else can claim it.
-
 - [ ] **Settings → General → Default branch**: switch to `main`.
 - [ ] **Settings → Pages → Build and deployment → Source**: choose **GitHub Actions**.
-- [ ] **Settings → Pages → Custom domain**: type `automine.com.br` and **Save**. GitHub's DNS check will complain until step 3 is done. That's expected.
-- [ ] **Actions → "Deploy site to GitHub Pages" → Run workflow** (or ask Claude to trigger it). The run should go green.
+- [ ] **Settings → Pages → Custom domain**: type `automine.com.br` and **Save**. GitHub's DNS check will complain until the domain points here. That's expected.
+- [ ] **Actions → "Deploy site to GitHub Pages" → Run workflow** (or ask Claude to trigger it).
 
 > If the run fails with *"Branch main is not allowed to deploy to github-pages due to environment protection rules"*, go to **Settings → Environments → github-pages → Deployment branches and tags** and add `main`.
 
-## 2. ImprovMX: free e-mail forwarding (about 5 min)
+## 2. Cloudflare: add the domain (Free plan)
 
-- [ ] Create a free account at **improvmx.com** and add the domain `automine.com.br`.
-- [ ] Create the alias **`vendas`** and point it at the inbox that should receive the leads (e.g. your Gmail).
-- [ ] ImprovMX creates a catch-all alias (`*`) by default, which forwards *every* address `@automine.com.br`. Delete it if you only want `vendas@`; that means less spam.
+- [ ] Create a Cloudflare account, choose **Add a domain**, enter `automine.com.br` and pick the **Free** plan. Cloudflare copies the current records.
+- [ ] Fix the copied records:
+  - Delete MX `0 .`.
+  - Delete TXT `v=spf1 -all`.
+  - Edit TXT `_dmarc` to `v=DMARC1; p=none;` for now (tightened in step 7).
+- [ ] Add the website records. Set **Proxy status** to **DNS only** (grey cloud), so GitHub can issue the HTTPS certificate:
 
-> **Free plan** (ImprovMX pricing page): 1 domain, 25 aliases, 500 forwarded e-mails a day (past that, mail bounces until 00:00 UTC) and 7 days of logs. Sending through ImprovMX (SMTP) is paid only, so replies go out from your own inbox, not from `vendas@`.
+  | Type  | Name  | Content                 | Proxy    |
+  |-------|-------|-------------------------|----------|
+  | A     | `@`   | `185.199.108.153`       | DNS only |
+  | A     | `@`   | `185.199.109.153`       | DNS only |
+  | A     | `@`   | `185.199.110.153`       | DNS only |
+  | A     | `@`   | `185.199.111.153`       | DNS only |
+  | AAAA  | `@`   | `2606:50c0:8000::153`   | DNS only |
+  | AAAA  | `@`   | `2606:50c0:8001::153`   | DNS only |
+  | AAAA  | `@`   | `2606:50c0:8002::153`   | DNS only |
+  | AAAA  | `@`   | `2606:50c0:8003::153`   | DNS only |
+  | CNAME | `www` | `monolito123.github.io` | DNS only |
 
-## 3. Registro.br: DNS, all in one session
+- [ ] Write down the **two nameservers** Cloudflare assigns (`something.ns.cloudflare.com`). They're unique to your account.
 
-Go to **registro.br → Painel → automine.com.br → DNS → Editar zona**. In the **Name** field, "(empty)" means the domain itself. Type the other names without the domain suffix (e.g. `www`, `_dmarc`): Registro.br adds `.automine.com.br` for you.
+## 3. Registro.br: point the domain to Cloudflare
 
-### Remove: these block e-mail
+- [ ] **registro.br → Painel → automine.com.br → DNS**: change the DNS servers from `a.auto.dns.br` / `b.auto.dns.br` to the two Cloudflare nameservers.
+- [ ] **DNSSEC:** make sure the current DS record (key tag `33150`) is removed. If the form has DNSSEC/DS fields, leave them **empty** for now.
+  - That key belongs to Registro.br's DNS service. If it stays after the switch, most resolvers will reject the domain, and the site and e-mail stop working.
+  - Ask Claude to check the `.br` registry after you save; this can be confirmed from public DNS.
+- [ ] Wait until Cloudflare shows the domain as **Active**. This usually takes an hour or two and can take up to 24 h.
 
-| Type | Name   | Value |
-|------|--------|-------|
-| MX   | (empty) | `0 .` (null MX) |
-| TXT  | (empty) | `v=spf1 -all` (replaced by ImprovMX's SPF below) |
+## 4. Turn DNSSEC back on, now with Cloudflare
 
-### Keep
+- [ ] **Cloudflare → DNS → Settings → DNSSEC → Enable**. Cloudflare shows the DS details: key tag, algorithm 13, digest type 2 and digest.
+- [ ] Add that DS in Registro.br's DNSSEC section for the domain.
 
-| Type | Name     | Value | Why |
-|------|----------|-------|-----|
-| TXT  | `_dmarc` | `v=DMARC1; p=reject;` | The domain never sends mail itself, so this stops anyone faking `vendas@automine.com.br`. It doesn't affect forwarded mail. |
+## 5. Receive: Cloudflare Email Routing (free)
 
-### Add: website (GitHub Pages)
+- [ ] **Cloudflare → Email → Email Routing**, then set up the domain. Cloudflare adds these records automatically:
 
-| Type  | Name   | Value                   |
-|-------|--------|-------------------------|
-| A     | (empty) | `185.199.108.153`       |
-| A     | (empty) | `185.199.109.153`       |
-| A     | (empty) | `185.199.110.153`       |
-| A     | (empty) | `185.199.111.153`       |
-| AAAA  | (empty) | `2606:50c0:8000::153`   |
-| AAAA  | (empty) | `2606:50c0:8001::153`   |
-| AAAA  | (empty) | `2606:50c0:8002::153`   |
-| AAAA  | (empty) | `2606:50c0:8003::153`   |
-| CNAME | `www`  | `monolito123.github.io` |
+  | Type | Name                  | Content |
+  |------|-----------------------|---------|
+  | MX   | `@`                   | `route1.mx.cloudflare.net`, `route2.mx.cloudflare.net`, `route3.mx.cloudflare.net` (priorities set by Cloudflare) |
+  | TXT  | `@`                   | `v=spf1 include:_spf.mx.cloudflare.net ~all` |
+  | TXT  | `cf2024-1._domainkey` | DKIM key generated by Cloudflare |
 
-### Add: e-mail forwarding (ImprovMX)
+- [ ] **Destination addresses**: add the inbox that should receive leads (e.g. your Gmail), then click the verification link Cloudflare e-mails you. Rules stay disabled until you do.
+- [ ] **Routing rules → Custom address**: `vendas@automine.com.br` → that inbox.
 
-| Type | Name   | Priority | Value |
-|------|--------|----------|-------|
-| MX   | (empty) | 10       | `mx1.improvmx.com` |
-| MX   | (empty) | 20       | `mx2.improvmx.com` |
-| TXT  | (empty) |          | `v=spf1 include:spf.improvmx.com ~all` |
+## 6. Send as vendas@ from Gmail: pick one option
 
-Keep **only one** SPF record (`v=spf1 …`). ImprovMX needs it because forwarded mail goes out with your domain as the envelope sender, so it can handle bounces.
+Cloudflare Email Routing only *receives*. To send as `vendas@automine.com.br`, Gmail needs an SMTP server that is allowed to send for the domain.
 
-## 4. Finish and test
+### Option A: Cloudflare Email Sending (paid)
+
+The Workers **Paid** plan is required, and the feature is in **beta**. It includes 3,000 e-mails a month, then US$0.35 per 1,000 (Cloudflare pricing page).
+
+- [ ] Subscribe to Workers Paid, then onboard `automine.com.br` for **Email Sending**. Cloudflare adds its records on the `cf-bounce` subdomain (MX, SPF, DKIM `cf-bounce._domainkey`) automatically.
+- [ ] Create a Cloudflare **API token** with the permission **Email Sending: Edit**.
+- [ ] In **Gmail → Settings → Accounts and Import → Send mail as → Add another email address**:
+  - Name: e.g. *Automine Vendas*. Address: `vendas@automine.com.br`.
+  - SMTP server: `smtp.mx.cloudflare.net`, port `465`, **Secured connection using SSL**.
+  - Username: the literal text `api_token`. Password: the API token.
+  - Gmail sends a confirmation code to `vendas@`. Email Routing delivers it to your inbox; enter the code.
+
+### Option B: free outside SMTP service
+
+Some e-mail delivery services (for example Brevo) have free tiers that include an SMTP server. Limits change, so check them on the provider's site.
+
+- [ ] Create the account and authenticate `automine.com.br`. Add the DNS records their dashboard shows (usually DKIM) in Cloudflare.
+- [ ] If they ask for an SPF `include:`, add it to the **same** SPF record. Example: `v=spf1 include:_spf.mx.cloudflare.net include:<their-include> ~all`. Only one SPF record is allowed, and SPF allows at most 10 DNS lookups.
+- [ ] Set up Gmail's **Send mail as** exactly like Option A, using their SMTP host, port and credentials.
+
+## 7. Finish and test
 
 - [ ] **GitHub → Settings → Pages**: once the certificate is ready, tick **Enforce HTTPS**. This usually takes under an hour and can take up to 24 h.
 - [ ] Open https://automine.com.br and https://www.automine.com.br. The second should redirect to the first.
-- [ ] From an account **other than** the destination inbox, send an e-mail to `vendas@automine.com.br`. It should arrive within a minute or two. Gmail hides copies of messages you sent to yourself, so testing from the same account looks like a failure. ImprovMX's dashboard shows the domain status and delivery logs. ImprovMX says DNS changes can take 24–48 h to fully propagate, though Registro.br is usually much faster.
-- [ ] Click the site's e-mail buttons and submit the contact form with "Enviar por e-mail". The message should reach your inbox.
+- [ ] From an account **other than** your inbox, send to `vendas@automine.com.br`. It should arrive within a minute or two. Gmail hides copies of messages you sent to yourself, so testing from the same account looks like a failure.
+- [ ] From Gmail, send *as* `vendas@` to another account and choose **⋮ → Show original**. SPF, DKIM and DMARC should all say **PASS**.
+- [ ] Click the site's e-mail buttons and submit the contact form with "Enviar por e-mail".
+- [ ] About a week later, if everything delivers fine, change `_dmarc` to `v=DMARC1; p=quarantine;`.
 
 ### Optional
 

@@ -40,7 +40,7 @@ Then open http://localhost:8000. Use a local server rather than opening the file
 
 `.github/workflows/deploy-pages.yml` publishes the site to GitHub Pages on every push to `main`. You can also run it by hand from the **Actions** tab. Only the public files are published: `index.html`, `404.html`, `assets/`, `robots.txt`, `sitemap.xml` and `site.webmanifest`.
 
-The one-time setup is in **[GO-LIVE.md](GO-LIVE.md)**: GitHub Pages settings, the Registro.br DNS records for the site and for free e-mail forwarding of `vendas@automine.com.br` (ImprovMX), and final tests.
+The one-time setup is in **[GO-LIVE.md](GO-LIVE.md)**: GitHub Pages settings, moving DNS from Registro.br to Cloudflare (including DNSSEC), the site's records, Cloudflare Email Routing for `vendas@automine.com.br`, the options for sending as that address from Gmail, and final tests.
 
 ## Before going live: please confirm
 

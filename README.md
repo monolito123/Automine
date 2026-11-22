@@ -2,9 +2,9 @@
 
 Landing page for **automine.com.br**: resource management and cost reduction (logistics and tax management), paid by commission on the savings generated. All site copy is in Brazilian Portuguese.
 
-Every call to action leads to **WhatsApp (+55 11 91146-8466)** or **e-mail (vendas@automine.com.br)**. Messages are pre-filled with the context the visitor came from (the plan, service or simulation they picked).
+Every call to action leads to **WhatsApp (+55 11 91146-8446)** or **e-mail (vendas@automine.com.br)**. Messages are pre-filled with the context the visitor came from (the plan, service or simulation they picked).
 
-It is a static site with no framework and no third-party requests: fonts are self-hosted and the illustrations are inline SVG. The only build step copies the public files into `dist/` (see [Deploy](#deploy)).
+It is a static site with no framework. Fonts are self-hosted and the illustrations are inline SVG. The page makes no third-party requests of its own; Cloudflare injects its cookie-free Web Analytics beacon, which you can turn off in the Cloudflare dashboard. The build step only copies the public files into `dist/` and prepares them for production (see [Deploy](#deploy)).
 
 ## Page structure
 
@@ -30,7 +30,7 @@ Then open http://localhost:8000. Use a local server rather than opening the file
 
 ## Editing
 
-- **Phone and e-mail**: change `CONTACT` at the top of `assets/js/main.js`. The same values also appear in the HTML as fallbacks for visitors without JavaScript, so search and replace `5511911468466` and `vendas@automine.com.br` in `index.html` as well.
+- **Phone and e-mail**: change `CONTACT` at the top of `assets/js/main.js`. The same values also appear in the HTML as fallbacks for visitors without JavaScript, so search and replace `5511911468446` and `vendas@automine.com.br` in `index.html` as well.
 - **Pre-filled messages**: each WhatsApp link has a `data-wa="…"` attribute holding its message. E-mail links use `data-mail-subject` / `data-mail-body`, where `&#10;` is a line break.
 - **Plans and percentages**: the plan cards (`#planos`), the simulator radios (`data-rate`), the FAQ and the hero card all mention 15/25/30%. Update all of them together.
 - **Colours and type**: the design tokens are at the top of `assets/css/styles.css` (`--gold-*`, `--violet-*`, `--bg-*`). Headings use Unbounded and body text uses Manrope.
@@ -38,7 +38,14 @@ Then open http://localhost:8000. Use a local server rather than opening the file
 
 ## Deploy
 
-The site runs on Cloudflare as the Worker `automine`. `tools/deploy_cloudflare.py` builds `dist/` with `tools/build.sh` and uploads the public files as data modules of the Worker, so there's no separate asset upload:
+The site runs on Cloudflare as the Worker `automine`. `tools/deploy_cloudflare.py` builds `dist/` with `tools/build.sh` and uploads the public files as data modules of the Worker, so there's no separate asset upload. The build also:
+
+- embeds the CSS in `index.html`, removing a render-blocking request;
+- adds `?v=<hash>` to the font, CSS, JS and icon URLs, so they can be cached for a year without going stale.
+
+The Worker sends HTML with revalidation, versioned files with one-year `immutable` caching, and everything else with a one-hour cache. It adds HSTS, `X-Frame-Options`, `Permissions-Policy`, `nosniff` and `Referrer-Policy`, and answers `If-None-Match` with 304. On the zone, Always Use HTTPS is on and the minimum TLS version is 1.2.
+
+Usage:
 
 ```bash
 CLOUDFLARE_API_TOKEN=<token> python3 tools/deploy_cloudflare.py            # publish
@@ -65,6 +72,7 @@ Run the script again after changing the site. The go-live status and the remaini
 - Semantic landmarks, skip link, labelled form fields, keyboard-friendly menu (Esc closes it), visible focus.
 - `prefers-reduced-motion` turns off every animation.
 - Checked with axe-core at desktop and mobile widths: 0 violations.
+- Lighthouse on the live site (mobile and desktop): 100 in performance, accessibility, best practices and SEO. Mobile LCP is 1.7 s, CLS 0.
 - No horizontal overflow from 320 px to 1920 px.
 
 ## Licences

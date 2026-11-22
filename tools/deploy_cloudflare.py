@@ -6,6 +6,8 @@ Uso:
 
 - Roda tools/build.sh e envia os arquivos públicos (dist/) como módulos de dados
   do Worker (sem etapa separada de upload de assets).
+- Cache: HTML sempre revalidado (com ETag/304); arquivos pedidos com ?v=<hash>
+  ficam 1 ano em cache; os demais, 1 hora.
 - Ativa o endereço <nome>.<subdomínio>.workers.dev.
 - Com --domains, liga automine.com.br e www.automine.com.br ao Worker
   (a zona precisa estar "active" na Cloudflare).
@@ -15,6 +17,7 @@ Workers Routes: Edit e Zone: Read (zona). CLOUDFLARE_ACCOUNT_ID é opcional.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import os
@@ -56,32 +59,53 @@ const FILES = {{
 const SECURITY_HEADERS = {{
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
+  "strict-transport-security": "max-age=31536000",
+  "x-frame-options": "DENY",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
 }};
+
+function cacheControl(file, url, status) {{
+  if (status !== 200 || file.html) return "public, max-age=0, must-revalidate";
+  if (url.searchParams.has("v")) return "public, max-age=31536000, immutable";
+  return "public, max-age=3600";
+}}
 
 export default {{
   async fetch(request) {{
     const url = new URL(request.url);
     if (url.hostname === "www.{zone}") {{
+      url.protocol = "https:";
       url.hostname = "{zone}";
       return Response.redirect(url.toString(), 301);
     }}
     if (request.method !== "GET" && request.method !== "HEAD") {{
       return new Response("Method Not Allowed", {{ status: 405, headers: {{ allow: "GET, HEAD" }} }});
     }}
-    let path = url.pathname;
+    let file;
     try {{
-      path = decodeURIComponent(path);
+      let path = decodeURIComponent(url.pathname);
+      if (path.endsWith("/")) path += "index.html";
+      file = FILES[path];
     }} catch {{
-      path = "/404.html";
+      file = undefined;
     }}
-    if (path.endsWith("/")) path += "index.html";
-    let file = FILES[path];
     let status = 200;
     if (!file) {{
       file = FILES["/404.html"];
       status = 404;
     }}
-    const headers = {{ "content-type": file.type, "cache-control": file.cache, ...SECURITY_HEADERS }};
+    const headers = {{
+      "content-type": file.type,
+      "cache-control": cacheControl(file, url, status),
+      etag: file.etag,
+      ...SECURITY_HEADERS,
+    }};
+    if (status === 200) {{
+      const inm = request.headers.get("if-none-match");
+      if (inm && inm.split(",").some((tag) => tag.trim().replace(/^W\\//, "") === file.etag)) {{
+        return new Response(null, {{ status: 304, headers }});
+      }}
+    }}
     const body = request.method === "HEAD" ? null : file.body.slice(0);
     return new Response(body, {{ status, headers }});
   }},
@@ -115,9 +139,10 @@ def build_worker(files: list[pathlib.Path]) -> str:
     for i, f in enumerate(files):
         rel = f.relative_to(DIST).as_posix()
         ctype = TYPES.get(f.suffix, mimetypes.guess_type(f.name)[0] or "application/octet-stream")
-        cache = "public, max-age=0, must-revalidate" if f.suffix == ".html" else "public, max-age=86400"
+        etag = hashlib.sha256(f.read_bytes()).hexdigest()[:16]
+        html = "true" if f.suffix == ".html" else "false"
         imports.append(f'import f{i} from "./{rel}";')
-        entries.append(f'  "/{rel}": {{ body: f{i}, type: "{ctype}", cache: "{cache}" }},')
+        entries.append(f'  "/{rel}": {{ body: f{i}, type: "{ctype}", etag: \'"{etag}"\', html: {html} }},')
     return WORKER_TEMPLATE.format(imports="\n".join(imports), entries="\n".join(entries), zone=ZONE_NAME)
 
 

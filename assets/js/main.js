@@ -8,7 +8,7 @@
    * mesmo sem JavaScript.)
    * ---------------------------------------------------------------- */
   const CONTACT = {
-    whatsapp: '5511911468466',
+    whatsapp: '5511911468446',
     email: 'vendas@automine.com.br',
   };
 
@@ -114,16 +114,31 @@
   const navLinks = [...document.querySelectorAll('.nav__list a')];
   const timeline = document.querySelector('[data-timeline]');
   const steps = timeline ? [...timeline.querySelectorAll('.step')] : [];
+  const stepNodes = steps.map((step) => step.querySelector('.step__node'));
 
+  // Todas as leituras de layout primeiro, depois todas as escritas (evita reflow forçado).
   const update = () => {
     const vh = window.innerHeight;
-    header?.classList.toggle('is-scrolled', window.scrollY > 12);
-
+    const scrollY = window.scrollY;
     const probe = vh * 0.4;
     const current = sections.find((s) => {
       const r = s.getBoundingClientRect();
       return r.top <= probe && r.bottom > probe;
     });
+    const maxScroll = document.documentElement.scrollHeight - vh;
+    const line = vh * 0.62;
+    let progress = 0;
+    let activeSteps = [];
+    if (timeline) {
+      const r = timeline.getBoundingClientRect();
+      progress = Math.min(1, Math.max(0, (line - r.top) / r.height));
+      activeSteps = stepNodes.map((node) => {
+        const n = node.getBoundingClientRect();
+        return n.top + n.height / 2 < line;
+      });
+    }
+
+    header?.classList.toggle('is-scrolled', scrollY > 12);
 
     if (rail) {
       if (current) {
@@ -132,8 +147,7 @@
         if (railLabel.textContent !== label) railLabel.textContent = label;
       }
       rail.classList.toggle('is-visible', Boolean(current));
-      const max = document.documentElement.scrollHeight - vh;
-      rail.style.setProperty('--p', max > 0 ? (window.scrollY / max).toFixed(3) : '0');
+      rail.style.setProperty('--p', maxScroll > 0 ? (scrollY / maxScroll).toFixed(3) : '0');
     }
 
     navLinks.forEach((a) => {
@@ -141,14 +155,8 @@
     });
 
     if (timeline) {
-      const r = timeline.getBoundingClientRect();
-      const line = vh * 0.62;
-      const progress = Math.min(1, Math.max(0, (line - r.top) / r.height));
       timeline.style.setProperty('--progress', progress.toFixed(3));
-      steps.forEach((step) => {
-        const node = step.querySelector('.step__node').getBoundingClientRect();
-        step.classList.toggle('is-active', node.top + node.height / 2 < line);
-      });
+      steps.forEach((step, i) => step.classList.toggle('is-active', activeSteps[i]));
     }
   };
 
@@ -163,7 +171,8 @@
   };
   window.addEventListener('scroll', requestUpdate, { passive: true });
   window.addEventListener('resize', requestUpdate);
-  update();
+  // Primeira leitura só depois do primeiro quadro desenhado, com o layout já calculado.
+  requestAnimationFrame(() => setTimeout(update, 0));
 
   /* ------------------------------------- parallax sutil no herói */
   const art = document.querySelector('[data-parallax]');
